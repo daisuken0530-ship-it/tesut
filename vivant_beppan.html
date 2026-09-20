@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自由の森学園 謎解き任務 - OPERATION VIVANT</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Share+Tech+Mono&family=Orbitron:wght@500;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        beppan: {
+                            red: '#e50914',
+                            redglow: '#ff1e27',
+                            gold: '#d4af37',
+                            dark: '#0a0a0d',
+                            panel: '#121218',
+                            border: '#2a2a36'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['Share Tech Mono', 'monospace'],
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        sans: ['Noto Sans JP', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scanlines & CRT FX */
+        body {
+            background-color: #08080a;
+            color: #e2e8f0;
+            font-family: 'Noto Sans JP', sans-serif;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        .tactical-border {
+            position: relative;
+            border: 1px solid #2a2a3d;
+            background: rgba(18, 18, 24, 0.85);
+            backdrop-filter: blur(8px);
+        }
+
+        .tactical-border::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px;
+            width: 10px; height: 10px;
+            border-top: 2px solid #e50914;
+            border-left: 2px solid #e50914;
+        }
+
+        .tactical-border::after {
+            content: '';
+            position: absolute;
+            bottom: -2px; right: -2px;
+            width: 10px; height: 10px;
+            border-bottom: 2px solid #e50914;
+            border-right: 2px solid #e50914;
+        }
+
+        .gold-corner::before { border-color: #d4af37 !important; }
+        .gold-corner::after { border-color: #d4af37 !important; }
+
+        /* Custom Glows */
+        .glow-red {
+            box-shadow: 0 0 15px rgba(229, 9, 20, 0.4);
+        }
+        .glow-gold {
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+        }
+        .text-glow-red {
+            text-shadow: 0 0 8px rgba(229, 9, 20, 0.7);
+        }
+        .text-glow-gold {
+            text-shadow: 0 0 8px rgba(212, 175, 55, 0.7);
+        }
+
+        /* Radar Animation */
+        @keyframes radar-sweep {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .radar-sweeper {
+            animation: radar-sweep 4s linear infinite;
+            transform-origin: center center;
+        }
+
+        /* Pulse Text */
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .animate-pulse-fast {
+            animation: pulse-fast 1s infinite;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0d;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e50914;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative selection:bg-beppan-red selection:text-white">
+
+    <!-- Scanline Overlay -->
+    <div class="fixed inset-0 scanlines z-50"></div>
+
+    <!-- HUD Header -->
+    <header class="border-b border-beppan-border bg-beppan-dark/95 backdrop-blur sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <!-- Brand / Top Secret Status -->
+            <div class="flex items-center space-x-3">
+                <div class="w-3 h-3 bg-beppan-red rounded-full animate-ping"></div>
+                <div>
+                    <h1 class="font-orbitron font-extrabold tracking-widest text-lg md:text-xl text-white flex items-center gap-2">
+                        <span>OPERATION</span>
+                        <span class="text-beppan-red">VIVANT</span>
+                        <span class="text-xs font-mono bg-beppan-red/20 text-beppan-red border border-beppan-red/50 px-1.5 py-0.5 rounded">別班極秘</span>
+                    </h1>
+                    <p class="text-[10px] font-mono text-gray-400">JIYU NO MORI GAKUEN MISSION CONTROL</p>
+                </div>
+            </div>
+
+            <!-- Controls & Audio Switch -->
+            <div class="flex items-center space-x-3 text-xs font-mono">
+                <!-- Sound Toggle Button -->
+                <button id="soundToggleBtn" onclick="toggleSound()" class="px-2.5 py-1.5 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-red text-gray-300 flex items-center gap-1.5 transition">
+                    <i id="soundIcon" class="fas fa-volume-up text-beppan-gold"></i>
+                    <span id="soundLabel">SOUND ON</span>
+                </button>
+                <!-- Reset Progress Button -->
+                <button onclick="confirmReset()" class="px-2.5 py-1.5 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-red text-gray-400 hover:text-white transition">
+                    <i class="fas fa-undo-alt"></i> リセット
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Step Tracker Indicator -->
+        <div class="max-w-5xl mx-auto mt-3 grid grid-cols-5 gap-1 text-[11px] font-mono text-center">
+            <div id="step-btn-1" class="py-1 px-1 border border-beppan-border rounded text-gray-500 transition">CP1: 重さ</div>
+            <div id="step-btn-2" class="py-1 px-1 border border-beppan-border rounded text-gray-500 transition">CP2: バルカ</div>
+            <div id="step-btn-3" class="py-1 px-1 border border-beppan-border rounded text-gray-500 transition">CP3: 通信</div>
+            <div id="step-btn-4" class="py-1 px-1 border border-beppan-border rounded text-gray-500 transition">FINAL: 地図</div>
+            <div id="step-btn-5" class="py-1 px-1 border border-beppan-border rounded text-gray-500 transition">CLEAR</div>
+        </div>
+    </header>
+
+    <!-- Main Content Dynamic Container -->
+    <main class="flex-grow max-w-4xl w-full mx-auto p-4 md:p-6 z-10 my-4">
+
+        <!-- ================= SECTION 0: MISSION BRIEFING ================= -->
+        <section id="sec-briefing" class="space-y-6">
+            <div class="tactical-border p-6 rounded-lg space-y-4">
+                <div class="flex items-center justify-between border-b border-beppan-border pb-3">
+                    <span class="text-xs font-mono text-beppan-gold tracking-widest"><i class="fas fa-shield-alt mr-1"></i> TOP SECRET / BEPPAN BRIEFING</span>
+                    <span class="text-xs font-mono text-red-500 animate-pulse-fast">● LIVE DISPATCH</span>
+                </div>
+
+                <div class="text-center py-2">
+                    <h2 class="text-2xl md:text-3xl font-bold tracking-tight text-white font-orbitron">自由の森学園 潜入任務</h2>
+                    <p class="text-beppan-gold text-sm font-mono mt-1">〜 影の組織「テント」の陰謀を阻止せよ 〜</p>
+                </div>
+
+                <div class="bg-black/60 p-4 rounded border border-gray-800 text-sm leading-relaxed space-y-3 font-mono text-gray-300">
+                    <p class="text-beppan-red font-bold">[緊急通達]</p>
+                    <p>自衛隊の影の諜報部隊「別班（BEPPAN）」精鋭捜査官の諸君。</p>
+                    <p>国際的謎の組織「テント」が、埼玉県飯能市・自由の森学園の学園祭に乗じ、校内に重大な暗号仕掛けのトラップを仕掛けたとの情報が入った。</p>
+                    <p>君たちの任務は、校内に散りばめられた4つのチェックポイントを突破し、隠された真の目的地を割り出すことである。</p>
+                </div>
+
+                <!-- Codename Input & Start Form -->
+                <div class="pt-2 space-y-3">
+                    <label class="block text-xs font-mono text-gray-400">エージェントコードネームを入力してください:</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="agentCodename" placeholder="例: 乃木 (NOGI)" maxlength="12" class="flex-grow bg-black/80 border border-beppan-border px-4 py-2.5 rounded text-white font-mono focus:border-beppan-red focus:outline-none focus:ring-1 focus:ring-beppan-red transition">
+                        <button onclick="startMission()" class="px-6 py-2.5 bg-beppan-red hover:bg-red-700 text-white font-bold rounded font-mono glow-red transition transform active:scale-95 flex items-center gap-2">
+                            <span>任務開始</span>
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 1: CHECKPOINT 1 (重さの試練) ================= -->
+        <section id="sec-cp1" class="hidden space-y-6">
+            <div class="tactical-border p-6 rounded-lg space-y-5">
+                <div class="flex justify-between items-center border-b border-beppan-border pb-3">
+                    <div>
+                        <span class="text-xs font-mono text-beppan-red font-bold">CHECKPOINT 01</span>
+                        <h3 class="text-xl font-bold text-white">重さの試練 (乃木の感覚再現)</h3>
+                    </div>
+                    <span class="text-xs font-mono bg-beppan-panel border border-beppan-gold/40 text-beppan-gold px-2 py-1 rounded">難易度: ★☆☆</span>
+                </div>
+
+                <div class="text-sm text-gray-300 leading-relaxed bg-black/40 p-4 rounded border border-gray-800 space-y-2">
+                    <p><i class="fas fa-hand-holding mr-1 text-beppan-gold"></i> 乃木卓造捜査官は手で持っただけで正確な重さを言い当てる特技を持つ。</p>
+                    <p>自由の森学園の食育パン工房で作られた特製パン。この重さをピッタリ合わせることで隠された暗号コードが解読される。</p>
+                    <p class="text-beppan-gold font-mono text-xs">【目標重量: 150g】アイテムを天秤に乗せて150gピッタリに調整せよ！</p>
+                </div>
+
+                <!-- Interactive Weight Balance Tool -->
+                <div class="bg-black/80 p-5 rounded-lg border border-beppan-border space-y-4">
+                    <div class="text-center space-y-1">
+                        <span class="text-xs font-mono text-gray-400">現在の計測重さ</span>
+                        <div class="text-4xl font-orbitron font-extrabold text-beppan-red" id="currentWeightDisplay">0 g</div>
+                    </div>
+
+                    <!-- Items Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono">
+                        <button onclick="toggleWeightItem(this, 10)" class="weight-btn p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-gold text-center transition flex flex-col items-center gap-1" data-weight="10">
+                            <i class="fas fa-cookie text-amber-600 text-lg"></i>
+                            <span>クッキー (+10g)</span>
+                        </button>
+                        <button onclick="toggleWeightItem(this, 40)" class="weight-btn p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-gold text-center transition flex flex-col items-center gap-1" data-weight="40">
+                            <i class="fas fa-bread-slice text-amber-500 text-lg"></i>
+                            <span>自の森パン (+40g)</span>
+                        </button>
+                        <button onclick="toggleWeightItem(this, 50)" class="weight-btn p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-gold text-center transition flex flex-col items-center gap-1" data-weight="50">
+                            <i class="fas fa-apple-alt text-red-500 text-lg"></i>
+                            <span>学園りんご (+50g)</span>
+                        </button>
+                        <button onclick="toggleWeightItem(this, 50)" class="weight-btn p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-gold text-center transition flex flex-col items-center gap-1" data-weight="50">
+                            <i class="fas fa-mortar-pestle text-stone-400 text-lg"></i>
+                            <span>自工芸の石 (+50g)</span>
+                        </button>
+                    </div>
+
+                    <div id="weightHintBox" class="text-center font-mono text-xs text-beppan-gold hidden">
+                        <i class="fas fa-check-circle mr-1 text-green-400"></i> 重量一致達成！解除用暗号コード: <span class="text-white font-bold underline">3821</span>
+                    </div>
+                </div>
+
+                <!-- Code Input Form -->
+                <div class="space-y-2 pt-2">
+                    <label class="block text-xs font-mono text-gray-400">解読コード入力 (150g達成時のコードを入力):</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="cp1CodeInput" placeholder="4桁の暗号" maxlength="6" class="flex-grow bg-black/80 border border-beppan-border px-4 py-2 rounded text-white font-mono focus:border-beppan-red focus:outline-none">
+                        <button onclick="verifyCP1()" class="px-5 py-2 bg-beppan-red hover:bg-red-700 text-white font-bold rounded font-mono">認証</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 2: CHECKPOINT 2 (バルカ文字解読) ================= -->
+        <section id="sec-cp2" class="hidden space-y-6">
+            <div class="tactical-border p-6 rounded-lg space-y-5">
+                <div class="flex justify-between items-center border-b border-beppan-border pb-3">
+                    <div>
+                        <span class="text-xs font-mono text-beppan-red font-bold">CHECKPOINT 02</span>
+                        <h3 class="text-xl font-bold text-white">バルカ文字暗号の解読</h3>
+                    </div>
+                    <span class="text-xs font-mono bg-beppan-panel border border-beppan-gold/40 text-beppan-gold px-2 py-1 rounded">難易度: ★★☆</span>
+                </div>
+
+                <div class="text-sm text-gray-300 leading-relaxed bg-black/40 p-4 rounded border border-gray-800 space-y-2">
+                    <p><i class="fas fa-language mr-1 text-beppan-gold"></i> バルカ共和国の古代文字で書かれた「テント」の機密命令文を入手した。</p>
+                    <p>下記のインタラクティブ・バルカ文字デコーダーを使用して、アルファベット記号を復元し、合言葉を特定せよ。</p>
+                </div>
+
+                <!-- Balka Decoder Tool -->
+                <div class="bg-black/90 p-4 rounded-lg border border-beppan-border space-y-3">
+                    <div class="text-xs font-mono text-beppan-gold flex justify-between items-center">
+                        <span><i class="fas fa-terminal mr-1"></i> バルカ文字変換マトリクス</span>
+                        <span class="text-gray-400">文字をタップして解読</span>
+                    </div>
+
+                    <!-- Cipher Grid -->
+                    <div class="grid grid-cols-4 gap-2 font-mono text-center">
+                        <button onclick="pressBalka('T')" class="p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-red transition flex flex-col items-center">
+                            <span class="text-2xl text-beppan-red font-bold">⌬</span>
+                            <span class="text-[10px] text-gray-400 mt-1">[ T ]</span>
+                        </button>
+                        <button onclick="pressBalka('E')" class="p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-red transition flex flex-col items-center">
+                            <span class="text-2xl text-beppan-red font-bold">⍟</span>
+                            <span class="text-[10px] text-gray-400 mt-1">[ E ]</span>
+                        </button>
+                        <button onclick="pressBalka('N')" class="p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-red transition flex flex-col items-center">
+                            <span class="text-2xl text-beppan-red font-bold">⍝</span>
+                            <span class="text-[10px] text-gray-400 mt-1">[ N ]</span>
+                        </button>
+                        <button onclick="pressBalka('T')" class="p-3 bg-beppan-panel border border-beppan-border rounded hover:border-beppan-red transition flex flex-col items-center">
+                            <span class="text-2xl text-beppan-red font-bold">⌬</span>
+                            <span class="text-[10px] text-gray-400 mt-1">[ T ]</span>
+                        </button>
+                    </div>
+
+                    <!-- Output Buffer -->
+                    <div class="bg-black border border-gray-800 p-3 rounded flex items-center justify-between font-mono">
+                        <span class="text-xs text-gray-500">デコード結果:</span>
+                        <span id="balkaOutput" class="text-lg font-bold text-beppan-gold tracking-widest">_ _ _ _</span>
+                        <button onclick="clearBalka()" class="text-xs text-gray-400 hover:text-white"><i class="fas fa-times"></i> クリア</button>
+                    </div>
+                </div>
+
+                <!-- Code Entry -->
+                <div class="space-y-2 pt-2">
+                    <label class="block text-xs font-mono text-gray-400">解読されたターゲット組織名 (4英字):</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="cp2CodeInput" placeholder="例: TENT" uppercase maxlength="10" class="flex-grow bg-black/80 border border-beppan-border px-4 py-2 rounded text-white font-mono uppercase focus:border-beppan-red focus:outline-none">
+                        <button onclick="verifyCP2()" class="px-5 py-2 bg-beppan-red hover:bg-red-700 text-white font-bold rounded font-mono">認証</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 3: CHECKPOINT 3 (通信遮断解除) ================= -->
+        <section id="sec-cp3" class="hidden space-y-6">
+            <div class="tactical-border p-6 rounded-lg space-y-5">
+                <div class="flex justify-between items-center border-b border-beppan-border pb-3">
+                    <div>
+                        <span class="text-xs font-mono text-beppan-red font-bold">CHECKPOINT 03</span>
+                        <h3 class="text-xl font-bold text-white">校内通信遮断ノードの解除</h3>
+                    </div>
+                    <span class="text-xs font-mono bg-beppan-panel border border-beppan-gold/40 text-beppan-gold px-2 py-1 rounded">難易度: ★★☆</span>
+                </div>
+
+                <div class="text-sm text-gray-300 leading-relaxed bg-black/40 p-4 rounded border border-gray-800 space-y-2">
+                    <p><i class="fas fa-wifi mr-1 text-beppan-gold"></i> 広大な自由の森学園の敷地内で別班の本部通信が妨害されている。</p>
+                    <p>4つのサイバー通信ノードの周波数を正しい順番でオンラインにし、バイパスコード【7120】を入力せよ。</p>
+                </div>
+
+                <!-- Node Sequence Widget -->
+                <div class="bg-black/90 p-4 rounded-lg border border-beppan-border space-y-3 font-mono">
+                    <div class="text-xs text-gray-400 flex justify-between">
+                        <span>ノード・バイパスパネル</span>
+                        <span id="nodeStatusText" class="text-beppan-red">オフライン</span>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <button onclick="toggleNode(0)" id="node-0" class="p-3 bg-beppan-panel border border-red-900 rounded text-xs text-gray-400 hover:border-beppan-red transition">
+                            <div class="text-lg font-bold">N-7</div>
+                            <div class="text-[9px] mt-1">NODE 1</div>
+                        </button>
+                        <button onclick="toggleNode(1)" id="node-1" class="p-3 bg-beppan-panel border border-red-900 rounded text-xs text-gray-400 hover:border-beppan-red transition">
+                            <div class="text-lg font-bold">N-1</div>
+                            <div class="text-[9px] mt-1">NODE 2</div>
+                        </button>
+                        <button onclick="toggleNode(2)" id="node-2" class="p-3 bg-beppan-panel border border-red-900 rounded text-xs text-gray-400 hover:border-beppan-red transition">
+                            <div class="text-lg font-bold">N-2</div>
+                            <div class="text-[9px] mt-1">NODE 3</div>
+                        </button>
+                        <button onclick="toggleNode(3)" id="node-3" class="p-3 bg-beppan-panel border border-red-900 rounded text-xs text-gray-400 hover:border-beppan-red transition">
+                            <div class="text-lg font-bold">N-0</div>
+                            <div class="text-[9px] mt-1">NODE 4</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Field -->
+                <div class="space-y-2 pt-2">
+                    <label class="block text-xs font-mono text-gray-400">通信解除キー入力 (7120):</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="cp3CodeInput" placeholder="4桁コード" maxlength="6" class="flex-grow bg-black/80 border border-beppan-border px-4 py-2 rounded text-white font-mono focus:border-beppan-red focus:outline-none">
+                        <button onclick="verifyCP3()" class="px-5 py-2 bg-beppan-red hover:bg-red-700 text-white font-bold rounded font-mono">認証</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 4: FINAL PUZZLE (大謎 - 重ね合わせマップ) ================= -->
+        <section id="sec-final" class="hidden space-y-6">
+            <div class="tactical-border gold-corner p-6 rounded-lg space-y-5">
+                <div class="flex justify-between items-center border-b border-beppan-border pb-3">
+                    <div>
+                        <span class="text-xs font-mono text-beppan-gold font-bold">FINAL MISSION (大謎)</span>
+                        <h3 class="text-xl font-bold text-white">真の目的地 解読オペレーション</h3>
+                    </div>
+                    <span class="text-xs font-mono bg-beppan-panel border border-beppan-gold text-beppan-gold px-2 py-1 rounded">最高機密</span>
+                </div>
+
+                <div class="text-sm text-gray-300 leading-relaxed bg-black/40 p-4 rounded border border-gray-800 space-y-2">
+                    <p><i class="fas fa-map-marked-alt mr-1 text-beppan-gold"></i> 自由の森学園の校内マップ上に特殊な暗号が施されている。</p>
+                    <p>学園の名物<b>「ひつじ透明シート」</b>を重ねて格子位置を合わせ、さらに<b>「赤色フィルター」</b>を被せることで青色のノイズが消え、真の目的地と最終コードが浮かび上がる！</p>
+                </div>
+
+                <!-- Interactive Map Canvas Tool -->
+                <div class="bg-black p-3 rounded-lg border border-beppan-border space-y-3">
+                    <!-- Layer Toggle Switches -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+                        <button id="toggleSheepBtn" onclick="toggleOverlay('sheep')" class="px-3 py-2 bg-beppan-panel border border-gray-700 rounded text-gray-300 hover:border-beppan-gold flex items-center gap-1.5 transition">
+                            <i class="fas fa-layer-group text-beppan-gold"></i>
+                            <span>[1] ひつじシート: <b id="sheepStatus" class="text-red-500">OFF</b></span>
+                        </button>
+
+                        <button id="toggleRedBtn" onclick="toggleOverlay('red')" class="px-3 py-2 bg-beppan-panel border border-gray-700 rounded text-gray-300 hover:border-beppan-red flex items-center gap-1.5 transition">
+                            <i class="fas fa-filter text-beppan-red"></i>
+                            <span>[2] 赤フィルター: <b id="redStatus" class="text-red-500">OFF</b></span>
+                        </button>
+                    </div>
+
+                    <!-- Canvas Box -->
+                    <div class="relative w-full aspect-[4/3] bg-stone-900 rounded overflow-hidden border border-gray-800 flex items-center justify-center">
+                        <canvas id="mapCanvas" width="600" height="450" class="w-full h-full object-contain"></canvas>
+                    </div>
+
+                    <p class="text-[11px] font-mono text-gray-400 text-center">
+                        ※ 2つのフィルターを正しく重ね合わせると、地図上に隠された極秘コードが表示されます。
+                    </p>
+                </div>
+
+                <!-- Final Code Entry -->
+                <div class="space-y-2 pt-2">
+                    <label class="block text-xs font-mono text-beppan-gold font-bold">最終解読暗号 (CODE):</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="finalCodeInput" placeholder="マップから読み取った暗号 (例: 9999 または BEPPAN)" uppercase class="flex-grow bg-black/80 border border-beppan-gold px-4 py-2.5 rounded text-white font-mono uppercase focus:ring-1 focus:ring-beppan-gold focus:outline-none">
+                        <button onclick="verifyFinal()" class="px-6 py-2.5 bg-beppan-gold hover:bg-yellow-600 text-black font-extrabold rounded font-mono glow-gold">ミッション完了</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 5: MISSION ACCOMPLISHED (クリア画面) ================= -->
+        <section id="sec-cleared" class="hidden space-y-6">
+            <div class="tactical-border gold-corner p-6 rounded-lg text-center space-y-6">
+                <!-- Header Stamp -->
+                <div class="inline-block px-4 py-1.5 border-2 border-beppan-gold text-beppan-gold font-mono font-extrabold tracking-widest text-sm rounded bg-beppan-gold/10">
+                    MISSION ACCOMPLISHED / 任務完了
+                </div>
+
+                <div class="space-y-2">
+                    <h2 class="text-3xl font-extrabold text-white font-orbitron text-glow-gold">別班極秘証明書</h2>
+                    <p class="text-xs font-mono text-gray-400">JIYU NO MORI GAKUEN BEPPAN SPECIAL OPERATIVE CERTIFICATE</p>
+                </div>
+
+                <!-- Certificate Visual Card -->
+                <div id="certificateCard" class="bg-gradient-to-b from-beppan-panel to-black border-2 border-beppan-gold/60 p-6 rounded-xl max-w-md mx-auto space-y-4 shadow-2xl relative overflow-hidden">
+                    <div class="absolute top-2 right-2 text-beppan-gold/20 text-6xl font-orbitron font-extrabold pointer-events-none">BEPPAN</div>
+                    
+                    <div class="flex items-center justify-between border-b border-beppan-gold/30 pb-3">
+                        <span class="text-xs font-mono text-beppan-gold">自由の森学園 捜査本部</span>
+                        <span class="text-xs font-mono text-gray-400" id="certDate">2026.09.20</span>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-xs font-mono text-gray-400">特級捜査官 コードネーム</p>
+                        <p class="text-2xl font-bold text-white font-mono text-glow-red" id="certAgentName">NOGI</p>
+                    </div>
+
+                    <div class="py-3 my-2 border-y border-gray-800 text-xs font-mono text-gray-300 leading-relaxed">
+                        貴殿は「自由の森学園」に潜んだテントの全暗号を解除し、学園祭の平和を完全に守り抜いた。その卓越した推理力と即断力を称え、ここに最高位捜査官として認定する。
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-[11px] font-mono text-left bg-black/60 p-3 rounded border border-beppan-gold/30">
+                        <div><span class="text-gray-500">ランク:</span> <span class="text-beppan-gold font-bold">特級別班員</span></div>
+                        <div><span class="text-gray-500">クリア時間:</span> <span class="text-white" id="certTime">--:--</span></div>
+                        <div><span class="text-gray-500">場所:</span> <span class="text-white">自由の森学園</span></div>
+                        <div><span class="text-gray-500">ステータス:</span> <span class="text-green-400 font-bold">SECURED</span></div>
+                    </div>
+                </div>
+
+                <!-- Share / Action Buttons -->
+                <div class="flex flex-wrap justify-center gap-3 pt-2">
+                    <button onclick="shareResult()" class="px-5 py-2.5 bg-beppan-gold hover:bg-yellow-600 text-black font-bold rounded font-mono flex items-center gap-2">
+                        <i class="fas fa-share-alt"></i>
+                        <span>結果を共有 (コピー)</span>
+                    </button>
+                    <button onclick="confirmReset()" class="px-5 py-2.5 bg-beppan-panel border border-beppan-border text-gray-300 hover:text-white rounded font-mono">
+                        最初からやり直す
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Dialog (Replaces Browser Alert) -->
+    <div id="customModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="tactical-border max-w-sm w-full p-5 rounded-lg space-y-4 bg-beppan-panel text-center">
+            <div id="modalIcon" class="text-3xl text-beppan-red"><i class="fas fa-exclamation-triangle"></i></div>
+            <h4 id="modalTitle" class="text-lg font-bold text-white font-orbitron">警告</h4>
+            <p id="modalMessage" class="text-xs font-mono text-gray-300 leading-relaxed">コードが正しくありません。</p>
+            <button onclick="closeModal()" class="w-full py-2 bg-beppan-red text-white font-bold rounded font-mono">確認</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-beppan-border bg-beppan-dark py-4 px-4 text-center text-xs font-mono text-gray-500 z-10">
+        <p>OPERATION VIVANT IN JIYU NO MORI GAKUEN • Hanno, Saitama</p>
+        <p class="mt-1 text-[10px] text-gray-600">※GitHub Pages対応 インタラクティブWebアプリケーション</p>
+    </footer>
+
+    <script>
+        /* State Variables */
+        let state = {
+            agentName: 'NOGI',
+            currentStep: 0, // 0: Briefing, 1: CP1, 2: CP2, 3: CP3, 4: Final, 5: Cleared
+            cp1Weight: 0,
+            cp1Cleared: false,
+            cp2Sequence: '',
+            cp2Cleared: false,
+            cp3Nodes: [false, false, false, false],
+            cp3Cleared: false,
+            overlaySheep: false,
+            overlayRed: false,
+            soundEnabled: true,
+            startTime: null
+        };
+
+        /* Sound Synth Engine (Web Audio API) */
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playBeep(freq = 440, type = 'sine', duration = 0.1) {
+            if (!state.soundEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) { console.log(e); }
+        }
+
+        function playSuccessSound() {
+            if (!state.soundEnabled) return;
+            playBeep(523.25, 'triangle', 0.1);
+            setTimeout(() => playBeep(659.25, 'triangle', 0.1), 100);
+            setTimeout(() => playBeep(783.99, 'triangle', 0.25), 200);
+        }
+
+        function playErrorSound() {
+            if (!state.soundEnabled) return;
+            playBeep(200, 'sawtooth', 0.2);
+            setTimeout(() => playBeep(150, 'sawtooth', 0.3), 150);
+        }
+
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            const label = document.getElementById('soundLabel');
+            if (state.soundEnabled) {
+                icon.className = 'fas fa-volume-up text-beppan-gold';
+                label.innerText = 'SOUND ON';
+                playBeep(880, 'sine', 0.1);
+            } else {
+                icon.className = 'fas fa-volume-mute text-gray-500';
+                label.innerText = 'SOUND OFF';
+            }
+        }
+
+        /* Modal Popup System */
+        function showModal(title, msg, isError = true) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = msg;
+            const icon = document.getElementById('modalIcon');
+            icon.className = isError ? 'text-3xl text-beppan-red' : 'text-3xl text-beppan-gold';
+            icon.innerHTML = isError ? '<i class="fas fa-exclamation-triangle"></i>' : '<i class="fas fa-check-circle"></i>';
+            document.getElementById('customModal').classList.remove('hidden');
+            if (isError) playErrorSound(); else playSuccessSound();
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.add('hidden');
+            playBeep(400, 'sine', 0.05);
+        }
+
+        /* Navigation & Progression */
+        function updateUI() {
+            // Hide all sections
+            ['sec-briefing', 'sec-cp1', 'sec-cp2', 'sec-cp3', 'sec-final', 'sec-cleared'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+
+            // Step Button Highlights
+            for (let i = 1; i <= 5; i++) {
+                const btn = document.getElementById(`step-btn-${i}`);
+                if (i < state.currentStep) {
+                    btn.className = 'py-1 px-1 border border-green-600 bg-green-950/40 text-green-400 font-bold rounded';
+                } else if (i === state.currentStep) {
+                    btn.className = 'py-1 px-1 border border-beppan-red bg-beppan-red/20 text-beppan-red font-bold rounded animate-pulse';
+                } else {
+                    btn.className = 'py-1 px-1 border border-beppan-border rounded text-gray-500';
+                }
+            }
+
+            // Show active section
+            if (state.currentStep === 0) document.getElementById('sec-briefing').classList.remove('hidden');
+            else if (state.currentStep === 1) document.getElementById('sec-cp1').classList.remove('hidden');
+            else if (state.currentStep === 2) document.getElementById('sec-cp2').classList.remove('hidden');
+            else if (state.currentStep === 3) document.getElementById('sec-cp3').classList.remove('hidden');
+            else if (state.currentStep === 4) {
+                document.getElementById('sec-final').classList.remove('hidden');
+                drawMapCanvas();
+            }
+            else if (state.currentStep === 5) {
+                document.getElementById('sec-cleared').classList.remove('hidden');
+                setupCertificate();
+            }
+
+            saveState();
+        }
+
+        function startMission() {
+            const name = document.getElementById('agentCodename').value.trim();
+            if (!name) {
+                showModal('入力エラー', 'コードネームを入力してください。');
+                return;
+            }
+            state.agentName = name;
+            state.currentStep = 1;
+            state.startTime = new Date().getTime();
+            playSuccessSound();
+ updateUI();
+        }
+
+        /* Checkpoint 1: Weight Puzzle Logic */
+        function toggleWeightItem(btn, weight) {
+            playBeep(600, 'sine', 0.05);
+            if (btn.classList.contains('border-beppan-gold')) {
+                btn.classList.remove('border-beppan-gold', 'bg-beppan-gold/20');
+                state.cp1Weight -= weight;
+            } else {
+                btn.classList.add('border-beppan-gold', 'bg-beppan-gold/20');
+                state.cp1Weight += weight;
+            }
+
+            document.getElementById('currentWeightDisplay').innerText = `${state.cp1Weight} g`;
+            const hintBox = document.getElementById('weightHintBox');
+            if (state.cp1Weight === 150) {
+                hintBox.classList.remove('hidden');
+                playSuccessSound();
+            } else {
+                hintBox.classList.add('hidden');
+            }
+        }
+
+        function verifyCP1() {
+            const code = document.getElementById('cp1CodeInput').value.trim();
+            if (code === '3821' || (state.cp1Weight === 150 && code.length > 0)) {
+                state.cp1Cleared = true;
+                state.currentStep = 2;
+                showModal('認証成功', 'CHECKPOINT 01 クリア！バルカ文字の解読へ移行します。', false);
+                updateUI();
+            } else {
+                showModal('認証失敗', 'コードが正しくありません。目標重量 150g を目指してください。');
+            }
+        }
+
+        /* Checkpoint 2: Balka Puzzle Logic */
+        function pressBalka(char) {
+            playBeep(700, 'triangle', 0.08);
+            if (state.cp2Sequence.length < 4) {
+                state.cp2Sequence += char;
+                renderBalkaOutput();
+            }
+        }
+
+        function clearBalka() {
+            playBeep(300, 'sine', 0.05);
+            state.cp2Sequence = '';
+            renderBalkaOutput();
+        }
+
+        function renderBalkaOutput() {
+            const chars = state.cp2Sequence.padEnd(4, '_').split('');
+            document.getElementById('balkaOutput').innerText = chars.join(' ');
+        }
+
+        function verifyCP2() {
+            const input = document.getElementById('cp2CodeInput').value.trim().toUpperCase();
+            if (input === 'TENT' || state.cp2Sequence === 'TENT') {
+                state.cp2Cleared = true;
+                state.currentStep = 3;
+                showModal('認証成功', 'CHECKPOINT 02 クリア！敵組織「TENT」の暗号特定に成功。', false);
+                updateUI();
+            } else {
+                showModal('認証失敗', '正しい組織名を入力してください。(ヒント: TENT)');
+            }
+        }
+
+        /* Checkpoint 3: Cyber Node Logic */
+        function toggleNode(idx) {
+            playBeep(500, 'sawtooth', 0.08);
+            state.cp3Nodes[idx] = !state.cp3Nodes[idx];
+            const btn = document.getElementById(`node-${idx}`);
+            if (state.cp3Nodes[idx]) {
+                btn.className = 'p-3 bg-green-950/60 border border-green-500 rounded text-xs text-green-400 font-bold shadow-lg shadow-green-900/30';
+            } else {
+                btn.className = 'p-3 bg-beppan-panel border border-red-900 rounded text-xs text-gray-400 hover:border-beppan-red transition';
+            }
+
+            const activeCount = state.cp3Nodes.filter(Boolean).length;
+            const statusText = document.getElementById('nodeStatusText');
+            if (activeCount === 4) {
+                statusText.innerText = 'バイパス可能 (100%)';
+                statusText.className = 'text-green-400 font-bold';
+            } else {
+                statusText.innerText = `オンライン: ${activeCount}/4`;
+                statusText.className = 'text-beppan-red';
+            }
+        }
+
+        function verifyCP3() {
+            const code = document.getElementById('cp3CodeInput').value.trim();
+            if (code === '7120') {
+                state.cp3Cleared = true;
+                state.currentStep = 4;
+                showModal('通信復旧成功', 'CHECKPOINT 03 クリア！校内通信が復旧。大謎（マップ重ね合わせ）へ。', false);
+                updateUI();
+            } else {
+                showModal('認証失敗', 'バイパスコードが違います。(キー: 7120)');
+            }
+        }
+
+        /* Checkpoint 4: Map Visual Overlay Canvas Tool */
+        function toggleOverlay(type) {
+            playBeep(650, 'sine', 0.08);
+            if (type === 'sheep') {
+                state.overlaySheep = !state.overlaySheep;
+                document.getElementById('sheepStatus').innerText = state.overlaySheep ? 'ON' : 'OFF';
+                document.getElementById('sheepStatus').className = state.overlaySheep ? 'text-green-400' : 'text-red-500';
+            } else if (type === 'red') {
+                state.overlayRed = !state.overlayRed;
+                document.getElementById('redStatus').innerText = state.overlayRed ? 'ON' : 'OFF';
+                document.getElementById('redStatus').className = state.overlayRed ? 'text-green-400' : 'text-red-500';
+            }
+            drawMapCanvas();
+        }
+
+        function drawMapCanvas() {
+            const canvas = document.getElementById('mapCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Clear Background (Map Style)
+            ctx.fillStyle = '#181820';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw Campus Base Map (Jiyu no Mori Map Visual)
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#333344';
+
+            // School Building Blocks
+            ctx.fillStyle = '#222230';
+            ctx.fillRect(80, 100, 180, 120); // 本館
+            ctx.fillRect(320, 100, 160, 90);  // 体育館
+            ctx.fillRect(100, 260, 140, 100); // 食堂・パン工房
+
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Share Tech Mono';
+            ctx.fillText('[本館]', 140, 160);
+            ctx.fillText('[体育館]', 370, 150);
+            ctx.fillText('[新食堂/ひつじ広場]', 110, 310);
+
+            // Blue Noise Lines (Confusion layer)
+            ctx.strokeStyle = '#0088ff';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 15; i++) {
+                ctx.beginPath();
+                ctx.moveTo(30 + i * 35, 50);
+                ctx.lineTo(80 + i * 30, 400);
+                ctx.stroke();
+            }
+
+            // Hidden Red Text (Visible only with Red Filter)
+            ctx.fillStyle = '#ff0033';
+            ctx.font = 'bold 24px Orbitron';
+            ctx.fillText('GOAL CODE: 9999', 110, 340);
+            ctx.fillText('TARGET: SUN SQUARE', 100, 370);
+
+            // Layer 1: Sheep Transparent Sheet Overlay (Grids and cutout target)
+            if (state.overlaySheep) {
+                ctx.strokeStyle = '#d4af37';
+                ctx.lineWidth = 1.5;
+                // Grid pattern
+                for (let x = 0; x < w; x += 40) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+                }
+                for (let y = 0; y < h; y += 40) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+                }
+
+                // Sheep Silhouette Icon Target at Sheep Area
+                ctx.fillStyle = '#d4af37';
+                ctx.font = '28px FontAwesome';
+                ctx.fillText('🐑', 60, 330);
+            }
+
+            // Layer 2: Red Filter Overlay (Multiplies / Cancels out blue noise)
+            if (state.overlayRed) {
+                ctx.fillStyle = 'rgba(229, 9, 20, 0.75)';
+                ctx.fillRect(0, 0, w, h);
+
+                // Re-highlight the revealed secret code in bright white when red filter is on
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 26px Orbitron';
+                ctx.shadowColor = '#ffff00';
+                ctx.shadowBlur = 10;
+                ctx.fillText('★ CODE: 9999 ★', 180, 240);
+                ctx.fillText('真目的地: 太陽の広場', 160, 280);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function verifyFinal() {
+            const input = document.getElementById('finalCodeInput').value.trim().toUpperCase();
+            if (input === '9999' || input === 'BEPPAN' || input === 'BEPPAN9999') {
+                state.currentStep = 5;
+                showModal('全任務完了', 'おめでとう！自由の森学園の平和は守られた。', false);
+                updateUI();
+            } else {
+                showModal('解読失敗', 'コードが一致しません。ひつじシートと赤フィルターを重ね合わせて真のCODEを読み取ってください。');
+            }
+        }
+
+        /* Certificate Setup */
+        function setupCertificate() {
+            document.getElementById('certAgentName').innerText = state.agentName || 'NOGI';
+            const now = new Date();
+            document.getElementById('certDate').innerText = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
+            
+            if (state.startTime) {
+                const diffMs = now.getTime() - state.startTime;
+                const min = Math.floor(diffMs / 60000);
+                const sec = Math.floor((diffMs % 60000) / 1000);
+                document.getElementById('certTime').innerText = `${min}分 ${sec}秒`;
+            } else {
+                document.getElementById('certTime').innerText = '12分 45秒';
+            }
+        }
+
+        function shareResult() {
+            const text = `【自由の森学園 謎解き任務 OPERATION VIVANT】\n捜査官 ${state.agentName} は全チェックポイントを突破し、真の目的地を解放した！\nランク: 特級別班員\n#自由の森学園 #VIVANT #別班謎解き`;
+            
+            // Clipboard copy via execCommand fallback
+            const dummy = document.createElement('textarea');
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+
+            showModal('共有テキストコピー完了', '結果テキストをクリップボードにコピーしました！SNSや友達に共有してください。', false);
+        }
+
+        /* Persistence & Reset */
+        function saveState() {
+            try {
+                localStorage.setItem('vivant_mission_state', JSON.stringify(state));
+            } catch(e){}
+        }
+
+        function loadState() {
+            try {
+                const saved = localStorage.getItem('vivant_mission_state');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                }
+            } catch(e){}
+        }
+
+        function confirmReset() {
+            if (confirm('進捗をリセットして最初からやり直しますか？')) {
+                localStorage.removeItem('vivant_mission_state');
+                location.reload();
+            }
+        }
+
+        /* Window Onload */
+        window.onload = function() {
+            loadState();
+            updateUI();
+        };
+    </script>
+</body>
+</html>
